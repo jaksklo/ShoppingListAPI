@@ -27,7 +27,7 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
 
 
 # create a new user
-def create_user(db: Session, user_in: UserCreate):
+async def create_user(db: Session, user_in: UserCreate, profile_pic: UploadFile | None):
     user_in_dict = user_in.dict()
     if user_in_dict.get("password") != user_in_dict.get("confirm_password"):
         raise password_exception()
@@ -37,9 +37,25 @@ def create_user(db: Session, user_in: UserCreate):
     user_in_dict["hashed_password"] = hashed_password
     db_user = models.User(**user_in_dict)
     db.add(db_user)
+    db.flush()
+    if profile_pic:
+        target_dir = os.path.join(os.getcwd(), "media", "users", db_user.id)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
+        target_name = os.path.join(target_dir, "profile.png")
+        with open(target_name, "wb+") as f:
+            content = await profile_pic.read()
+            f.write(content)
+        db_user.profile_pic = target_name
     db.commit()
-    db.refresh(db_user)  # refresh your instance (so that it contains any new data from the database, like the generated ID)
+    db.refresh(db_user)
     return db_user
+
+
+
+    # db.commit()
+    # db.refresh(db_user)  # refresh your instance (so that it contains any new data from the database, like the generated ID)
+    # return db_user
 
 
 # get all products related to user's list
@@ -59,6 +75,7 @@ def delete_user(user_id: str, db: Session):
         try:
             target = os.path.join(os.getcwd(), "media", "users", user_id, "profile.png")
             os.remove(target)
+            os.rmdir(os.path.join(os.getcwd(), "media", "users", user_id))
         except OSError:
             pass
 

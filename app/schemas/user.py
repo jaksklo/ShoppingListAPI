@@ -1,5 +1,8 @@
+from fastapi import Form, UploadFile, File
 from pydantic import BaseModel, Field, EmailStr
-from typing import List
+from pydantic.dataclasses import dataclass
+
+from typing import List, Optional
 from app.schemas.shoppinglist import ShoppingList
 
 
@@ -37,3 +40,14 @@ class UserUpdate(BaseModel):
     confirm_password: str | None = Field(min_length=4, max_length=30)
     first_name: str | None = Field(min_length=1, max_length=50)
     last_name: str | None = Field(min_length=1, max_length=50)
+
+
+@dataclass
+class UserCreateForm:
+    username: str = Form(min_length=1, max_length=30)
+    email: EmailStr = Form()
+    first_name: str = Form(min_length=1, max_length=50)
+    last_name: str = Form(min_length=1, max_length=50)
+    password: str = Form(min_length=4, max_length=30)
+    confirm_password: str = Form(min_length=4, max_length=30)
+    profile_pic: Optional[UploadFile] = File(None)

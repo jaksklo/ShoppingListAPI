@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import FileResponse
 import app.crud.users as crud_user
 import app.crud.shopping_lists as crud_lists
@@ -7,14 +7,28 @@ from sqlalchemy.orm import Session
 from app.utils.database import get_db
 from typing import List
 from ..utils.authentication import get_current_active_user
-from app.schemas.user import User, UserCreate, UserInListView, UserUpdate
+from app.schemas.user import User, UserCreate, UserInListView, UserUpdate, UserCreateForm
 from app.schemas.product import Product
 from app.schemas.shoppinglist import ShoppingList
+from dataclasses import asdict
 
 router = APIRouter(prefix='/users', tags=['user'])
 
 
-@router.post("/", response_model=User)
+@router.post("/create", response_model=User)
+async def create_user(form_data: UserCreateForm = Depends(), db: Session = Depends(get_db)):
+    data = asdict(form_data)
+    user_in = UserCreate(**data)
+    db_user = crud_user.get_user_by_email_or_nick(db, user_schema=user_in)
+    if db_user:
+        raise HTTPException(status_code=400, detail="User already registered")
+    profile_pic = data.get("profile_pic", None)
+    user_db = await crud_user.create_user(db=db, user_in=user_in, profile_pic=profile_pic)
+
+    return user_db
+
+
+@router.post("/", response_model=User, deprecated=True)
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = crud_user.get_user_by_email_or_nick(db, user_schema=user)
     if db_user:
@@ -43,7 +57,6 @@ async def update_user_me(user_updates: UserUpdate, current_user: User = Depends(
 
 @router.delete("/me")
 async def delete_user_me(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-
     return crud_user.delete_user(user_id=current_user.id, db=db)
 
 
@@ -72,6 +85,7 @@ async def send_profile_picture(file: UploadFile, current_user: User = Depends(ge
 
 @router.get("/me/profilepic/", response_class=FileResponse)
 async def get_profile_picture(current_user: User = Depends(get_current_active_user),
-                               db: Session = Depends(get_db)):
-
+                              db: Session = Depends(get_db)):
     return crud_user.get_profile_pic(current_user.id, db)
+
+
